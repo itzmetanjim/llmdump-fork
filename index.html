@@ -1270,6 +1270,9 @@ Prism.plugins.toolbar.registerButton("download", env => {
         .bg-blobs .blob { position:absolute; filter:blur(120px); opacity:.55; mix-blend-mode:screen; }
         .bg-blobs .blob.b1 { width:700px; height:700px; top:-250px; left:-180px; background:radial-gradient(circle at 30% 30%, rgba(99,102,241,.8), rgba(99,102,241,0) 65%); }
         .bg-blobs .blob.b3 { width:500px; height:500px; top:40%; left:55%; background:radial-gradient(circle at 50% 50%, rgba(139,92,246,.55), rgba(139,92,246,0) 70%); }
+        .settings-modal-inner {
+            width:75%
+        }
     </style>
 </head>
 <body class="m-0 p-0">
@@ -1539,7 +1542,7 @@ Prism.plugins.toolbar.registerButton("download", env => {
 
     <!-- Settings Modal -->
     <div id="settingsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
-        <div class="glass p-6 w-full max-w-md relative">
+        <div class="glass p-6 settings-modal-inner relative">
             <button id="closeSettings" class="absolute top-3 right-3 rounded-full p-2">
                 <svg class="close-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -1572,10 +1575,12 @@ Prism.plugins.toolbar.registerButton("download", env => {
 
             <div class="mb-6">
                 <label class="block mb-2">Edit Personal Access Token</label>
+                <div class="flex">
                 <input type="password" id="settingsPat" class="w-full p-2 rounded bg-gray-800 border border-gray-700 mb-2" placeholder="github_pat_..." />
-                <button id="saveToken" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded w-full">
-                    Save Token
+                <button id="saveToken" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded w-fit">
+                    Save
                 </button>
+            </div>
             </div>
 
             <div class="flex gap-2 mb-4">
@@ -1586,6 +1591,47 @@ Prism.plugins.toolbar.registerButton("download", env => {
                     Import Chats
                 </button>
             </div>
+            <!--
+            <strong>Add OpenAI Compatible APIs</strong>
+            <div class="flex gap-2 mb-4">
+                <div class="flex-col gap-2 mb-4 w-full">
+                Base URL:
+                <input type="text" id="baseURLBox"  class="w-full p-2 rounded bg-gray-800 border border-gray-700 mb-2" placeholder="Base URL" />
+                </div>
+                <div class="flex-col gap-2 mb-4 w-full">
+                    API Key:
+                    <input type="text" id="apiKeyBox"  class="w-full p-2 rounded bg-gray-800 border border-gray-700 mb-2" placeholder="API Key" />
+                </div>
+                <div>
+                    <br>
+                    <button id="addApiKey" onclick="addApiKey()"class="flex-1 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded">
+                    Add
+                    </button>
+                </div>
+            </div>
+        <span id="apiKeyList">
+            < !--
+            <div class="flex">
+            <div class="bg-gray-700 hover:bg-gray-600 rounded w-full flex items-center m-2">
+                <p class="w-full p-2" >baseURL</p>
+                <button class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded w-fit justify-end m-2 whitespace-nowrap" onclick='navigator.clipboard.writeText("example API key")'>Copy key</button>
+                <button class="flex-1 bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded justify-end w-fit m-2 h-auto" onclick='deleteAPIkey(index)'>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                            <path d="M10 11v6"></path>
+                            <path d="M14 11v6"></path>
+                            <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path>
+                        </svg></button>
+                    </div>
+            </div>
+           -- >
+        -->
+        </span>
+
+
+
+        </div>
         </div>
     </div>
 
@@ -1639,6 +1685,7 @@ Prism.plugins.toolbar.registerButton("download", env => {
         const sidebarSettings = document.getElementById('sidebarSettings');
         const webSearchToggle = document.getElementById('webSearchToggle');
         const limitIndicatorSpan = document.getElementById('limitIndicatorSpan');
+        
         const tools = [
       {
         type: 'function',
@@ -1675,31 +1722,77 @@ Prism.plugins.toolbar.registerButton("download", env => {
                 webSearch = true
             }
         }
-        window.toggleWebSearch = toggleWebSearch;
-        async function searchAsync(query,page=1) {
+        window.toggleWebSearch = toggleWebSearch;        async function searchAsync(query,page=1) {
             const url = new URL(`${API_BASE}/search`);
             url.searchParams.set('query', query);
             url.searchParams.set('page', page);
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
+            
+            const makeRequest = async () => {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (response.status === 429) {
+                    throw new Error('HTTP 429');
                 }
-            });
-            return response.json()
-
-        }
-        async function searchToolAsync(query,page=1){
-            if(webSearch){return await searchAsync(query)}
-            else{ 
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                return response.json();
+            };
+            
+            try {
+                return await makeRequest();
+            } catch (err) {
+                if (err.message === 'HTTP 429') {
+                    // Wait 1 minute and retry once
+                    await new Promise(resolve => setTimeout(resolve, 60000));
+                    return await makeRequest();
+                }
+                throw err;
+            }
+        }        async function searchToolAsync(query,page=1){
+            if(webSearch){
+                return await searchAsync(query, page);
+            } else{ 
                 confirmation = confirm("The web search tool has been requested by the AI. Do you want to enable it?")
                 if (confirmation) {
                     toggleWebSearch()
-                    return await searchAsync(query);
+                    return await searchAsync(query, page);
                 }
                 return {
                     "ToolNotEnabled":"This tool was disabled by the user. The user was requested to enable it, but declined.\nTry continuing without the tool or asking the user to enable it."
                 }
+            }
+        }
+        
+        // Helper function to handle search with UI updates for rate limiting
+        async function executeSearchWithUI(query, searchNotices, streamingResponse, chatBox) {
+            try {
+                // Add temporary searching message
+                const tempSearchNotice = `###### Searching...`;
+                const currentContent = searchNotices.join('\n') + (searchNotices.length ? '\n' : '');
+                const tempContent = currentContent + tempSearchNotice;
+                
+                // Update UI with searching message
+                streamingResponse.innerHTML = `<div class='assistant-response' data-role='assistant'><div class="markdown-body">${renderMd(tempContent)}</div></div>`;
+                streamingResponse.dataset.raw = tempContent;
+                chatBox.scrollTop = chatBox.scrollHeight;
+                highlightWithin(streamingResponse);
+                
+                const result = await searchAsync(query);
+                
+                // Replace searching message with actual search notice
+                searchNotices.push(`###### Searched "${query}"`);
+                return result;
+                
+            } catch (err) {
+                throw err;
             }
         }
 
@@ -2872,15 +2965,13 @@ User: "What is the best way to learn JavaScript?" → "Learning JavaScript"`;
                                 content: null,
                                 tool_calls: accumulatedToolCalls.map(tc => ({ id: tc.id, type: 'function', function: { name: tc.function?.name || '', arguments: tc.function?.arguments || '' } }))
                             };
-                            const toolResults = [];
-                            for(const tc of accumulatedToolCalls){
+                            const toolResults = [];                            for(const tc of accumulatedToolCalls){
                                 const fname = tc.function?.name || '';
                                 if(fname === 'web_search'){
                                     let query = '';
                                     try { const a = JSON.parse(tc.function?.arguments || '{}'); query = a.query || ''; } catch(_){ query = ''; }
                                     try {
-                                        const result = await searchToolAsync(query);
-                                        searchNotices.push(`###### Searched "${query}"`);
+                                        const result = await executeSearchWithUI(query, searchNotices, streamingResponse, chatBox);
                                         toolResults.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) });
                                     } catch(err){
                                         toolResults.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify({ error: String(err?.message || err) }) });
@@ -2944,13 +3035,15 @@ User: "What is the best way to learn JavaScript?" → "Learning JavaScript"`;
                                 }
                                 if(roundHasTools){
                                     const followAssistant = { role: 'assistant', content: null, tool_calls: roundToolCalls.map(tc => ({ id: tc.id, type:'function', function:{ name: tc.function?.name || '', arguments: tc.function?.arguments || '' } })) };
-                                    const followToolResults = [];
-                                    for(const tc of roundToolCalls){
+                                    const followToolResults = [];                                    for(const tc of roundToolCalls){
                                         const fname = tc.function?.name || '';
                                         if(fname === 'web_search'){
                                             let query = '';
                                             try { const a = JSON.parse(tc.function?.arguments || '{}'); query = a.query || ''; } catch(_){ query = ''; }
-                                            try { const result = await searchToolAsync(query); searchNotices.push(`###### Searched "${query}"`); followToolResults.push({ role:'tool', tool_call_id: tc.id, content: JSON.stringify(result) }); }
+                                            try { 
+                                                const result = await executeSearchWithUI(query, searchNotices, streamingResponse, chatBox);
+                                                followToolResults.push({ role:'tool', tool_call_id: tc.id, content: JSON.stringify(result) }); 
+                                            }
                                             catch(err){ followToolResults.push({ role:'tool', tool_call_id: tc.id, content: JSON.stringify({ error: String(err?.message || err) }) }); }
                                         } else {
                                             followToolResults.push({ role:'tool', tool_call_id: tc.id, content: JSON.stringify({ error: `Unsupported tool ${fname}` }) });
@@ -3318,13 +3411,15 @@ User: "What is the best way to learn JavaScript?" → "Learning JavaScript"`;
                     if(toolsDetected){
                         (async ()=>{
                             const assistantToolMsg = { role:'assistant', content:null, tool_calls: accumulatedToolCalls.map(tc => ({ id: tc.id, type:'function', function:{ name: tc.function?.name || '', arguments: tc.function?.arguments || '' } })) };
-                            const toolResults = [];
-                            for(const tc of accumulatedToolCalls){
+                            const toolResults = [];                            for(const tc of accumulatedToolCalls){
                                 const fname = tc.function?.name || '';
                                 if(fname === 'web_search'){
                                     let query = '';
                                     try { const a = JSON.parse(tc.function?.arguments || '{}'); query = a.query || ''; } catch(_){ query = ''; }
-                                    try { const result = await searchToolAsync(query); searchNotices.push(`###### Searched "${query}"`); toolResults.push({ role:'tool', tool_call_id: tc.id, content: JSON.stringify(result) }); }
+                                    try { 
+                                        const result = await executeSearchWithUI(query, searchNotices, streamingResponse, chatBox);
+                                        toolResults.push({ role:'tool', tool_call_id: tc.id, content: JSON.stringify(result) }); 
+                                    }
                                     catch(err){ toolResults.push({ role:'tool', tool_call_id: tc.id, content: JSON.stringify({ error: String(err?.message || err) }) }); }
                                 } else {
                                     toolResults.push({ role:'tool', tool_call_id: tc.id, content: JSON.stringify({ error: `Unsupported tool ${fname}` }) });
@@ -3340,13 +3435,17 @@ User: "What is the best way to learn JavaScript?" → "Learning JavaScript"`;
                                 while(true){ const {done, value} = await rdr.read(); if(done) break; buf += new TextDecoder().decode(value,{stream:true}); const parts = buf.split('\n'); buf = parts.pop() || ''; for(const raw of parts){ const line = raw.trim(); if(!line || !line.startsWith('data:')) continue; const data = line.slice(5).trim().replace(/^:\s*/, ''); if(data === '[DONE]') break; try{ const parsed = JSON.parse(data); const delta = parsed.choices?.[0]?.delta || {}; norm(delta); const c = delta.content || ''; if(c){ out += c; const preview = (searchNotices.join('\n') + (searchNotices.length?'\n':'') + out); streamingResponse.innerHTML = `<div class='assistant-response' data-role='assistant'><div class=\"markdown-body\">${renderMd(preview)}</div></div>`; streamingResponse.dataset.raw = preview; chatBox.scrollTop = chatBox.scrollHeight; highlightWithin(streamingResponse); } }catch(_){ /* ignore */ } } }
                                 if(roundHasTools){
                                     const followAssistant = { role:'assistant', content:null, tool_calls: roundToolCalls.map(tc => ({ id: tc.id, type:'function', function:{ name: tc.function?.name || '', arguments: tc.function?.arguments || '' } })) };
-                                    const followToolResults = [];
-                                    for(const tc of roundToolCalls){
+                                    const followToolResults = [];                                    for(const tc of roundToolCalls){
                                         const fname = tc.function?.name || '';
                                         if(fname === 'web_search'){
                                             let query = '';
                                             try { const a = JSON.parse(tc.function?.arguments || '{}'); query = a.query || ''; } catch(_){ query = ''; }
-                                            try { const result = await searchToolAsync(query); searchNotices.push(`###### Searched "${query}"`); followToolResults.push({ role:'tool', tool_call_id: tc.id, content: JSON.stringify(result) }); } catch(err){ followToolResults.push({ role:'tool', tool_call_id: tc.id, content: JSON.stringify({ error: String(err?.message || err) }) }); }
+                                            try { 
+                                                const result = await executeSearchWithUI(query, searchNotices, streamingResponse, chatBox);
+                                                followToolResults.push({ role:'tool', tool_call_id: tc.id, content: JSON.stringify(result) }); 
+                                            } catch(err){ 
+                                                followToolResults.push({ role:'tool', tool_call_id: tc.id, content: JSON.stringify({ error: String(err?.message || err) }) }); 
+                                            }
                                         } else {
                                             followToolResults.push({ role:'tool', tool_call_id: tc.id, content: JSON.stringify({ error: `Unsupported tool ${fname}` }) });
                                         }
